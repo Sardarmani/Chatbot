@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1, h2 {
+            color: #333;
+        }
+
+        form {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+        }
+
+        select, input[type="file"], input[type="text"], button {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #007bff;
+            border: none;
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #response {
+            background-color: #e7f1ff;
+            border: 1px solid #b3d4fc;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 20px;
+            width: 100%;
+            max-width: 600px;
+            text-align: left;
+        }
+
+        .logout-button {
+            background-color: #dc3545;
+            margin-top: 20px;
+        }
+
+        .logout-button:hover {
+            background-color: #c82333;
+        }
+    </style>
+    <script>
+        async function sendMessage(event) {
+            event.preventDefault();
+
+            const question = document.getElementById('question').value;
+            const responseElement = document.getElementById('response');
+            responseElement.textContent = 'Loading...';
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ question: question })
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    responseElement.textContent = 'Response: ' + result.response;
+                } else {
+                    responseElement.textContent = 'Error: ' + result.error;
+                }
+            } catch (error) {
+                responseElement.textContent = 'Network error: ' + error.message;
+            }
+        }
+
+        async function uploadFiles(event) {
+            event.preventDefault();
+
+            const form = document.getElementById('upload-form');
+            const formData = new FormData(form);
+            const responseElement = document.getElementById('response');
+            responseElement.textContent = 'Uploading...';
+
+            try {
+                const response = await fetch('/upload-files', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    responseElement.textContent = 'Upload successful: ' + result.message;
+                } else {
+                    responseElement.textContent = 'Error: ' + result.error;
+                }
+            } catch (error) {
+                responseElement.textContent = 'Network error: ' + error.message;
+            }
+        }
+
+        function logout() {
+            window.location.href = '/logout';
+        }
+    </script>
+</head>
+<body>
+    <h1>Reconnect with Your Loved Ones</h1>
+    <form id="upload-form" onsubmit="uploadFiles(event)" enctype="multipart/form-data">
+        <label for="persona">Choose a Persona:</label>
+        <select name="persona" id="persona">
+            <option value="Grandparent">Grandparent</option>
+            <option value="Partner">Partner</option>
+            <option value="Aunt or Uncle">Aunt or Uncle</option>
+            <option value="Colleague">Colleague</option>
+            <option value="Brother or Sister">Brother or Sister</option>
+            <option value="Parent">Parent</option>
+            <option value="Best Friend">Best Friend</option>
+            <option value="Enemy">Enemy</option>
+        </select><br><br>
+
+        <label for="files">Upload Files:</label>
+        <input type="file" name="files" multiple><br><br>
+
+        <button type="submit">Upload Files</button>
+    </form>
+
+    <h2>Chat with your Persona</h2>
+    <form id="chat-form" onsubmit="sendMessage(event)">
+        <label for="question">Enter your message:</label>
+        <input type="text" id="question" name="question" required><br><br>
+        <button type="submit">Send Message</button>
+    </form>
+
+    <div id="response"></div>
+    
+    <button class="logout-button" onclick="logout()">Logout</button>
+</body>
+</html>
