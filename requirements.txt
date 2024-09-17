@@ -9,3 +9,5 @@ pydub
 Pytesseract
 python-docx
 PyMuPDF
+Pillow==10.0.0
+moviepy==1.0.3
