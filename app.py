@@ -1,8 +1,15 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session, flash
 from werkzeug.utils import secure_filename
 import os
-from groq import Groq
+import fitz  # PyMuPDF
+from docx import Document
+import pytesseract
+from PIL import Image
 import aiofiles
+from groq import Groq
+import speech_recognition as sr
+from pydub import AudioSegment
+import moviepy.editor as mp
 from pydantic import BaseModel
 
 app = Flask(__name__)
@@ -34,12 +41,10 @@ def login():
             return redirect(url_for('login'))
     return render_template('login.html')
 
-
 @app.route('/logout')
 def logout():
     session.pop('user_id', None)
     return redirect(url_for('login'))
-
 
 # Route for home
 @app.route('/home')
@@ -48,16 +53,68 @@ def home():
         return redirect(url_for('login'))
     return render_template('home.html')
 
+# Function to extract text from PDF files
+def extract_text_from_pdf(file_path):
+    text = ""
+    pdf_document = fitz.open(file_path)
+    for page in pdf_document:
+        text += page.get_text()
+    return text
+
+# Function to extract text from DOCX files
+def extract_text_from_docx(file_path):
+    text = ""
+    doc = Document(file_path)
+    for para in doc.paragraphs:
+        text += para.text + "\n"
+    return text
+
+# Function to extract text from PNG images using OCR
+def extract_text_from_image(file_path):
+    text = pytesseract.image_to_string(Image.open(file_path))
+    return text
+
+# Function to extract text from audio files
+def extract_text_from_audio(file_path):
+    recognizer = sr.Recognizer()
+    audio = sr.AudioFile(file_path)
+    with audio as source:
+        audio_data = recognizer.record(source)
+    try:
+        text = recognizer.recognize_google(audio_data)
+    except sr.UnknownValueError:
+        text = "Could not understand audio"
+    except sr.RequestError:
+        text = "Could not request results; check your network connection"
+    return text
+
+# Function to extract text from video files
+def extract_text_from_video(file_path):
+    # Extract audio from video
+    video = mp.VideoFileClip(file_path)
+    audio_path = file_path.rsplit('.', 1)[0] + ".wav"
+    video.audio.write_audiofile(audio_path)
+    
+    # Transcribe the extracted audio
+    text = extract_text_from_audio(audio_path)
+    return text
 
 # Function to process text files
 async def process_text_file(file):
     content = await file.read()
     return content.decode('utf-8')
 
-# Function to process audio/video files (simulated processing)
+# Function to process audio/video files (actual processing)
 async def process_audio_file(file):
-    # Simulated transcription processing
-    return "Simulated transcription for audio or video file"
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
+    file.save(file_path)
+    
+    if file.content_type.startswith('audio'):
+        return extract_text_from_audio(file_path)
+    elif file.content_type.startswith('video'):
+        return extract_text_from_video(file_path)
+    else:
+        return "Unsupported file type"
 
 # Upload files route
 @app.route('/upload-files', methods=['POST'])
@@ -76,12 +133,24 @@ def upload_files():
     
     for file in files:
         filename = secure_filename(file.filename)
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(file_path)
         file_type = file.content_type
+        
         if file_type.startswith('text'):
             content = file.read().decode('utf-8')
             combined_content += content + "\n"
+        elif file_type.startswith('application/pdf'):
+            content = extract_text_from_pdf(file_path)
+            combined_content += content + "\n"
+        elif file_type.startswith('application/vnd.openxmlformats-officedocument.wordprocessingml.document'):
+            content = extract_text_from_docx(file_path)
+            combined_content += content + "\n"
+        elif file_type.startswith('image/'):
+            content = extract_text_from_image(file_path)
+            combined_content += content + "\n"
         elif file_type.startswith('audio') or file_type.startswith('video'):
-            content = "Simulated audio/video content processing"  # Placeholder for actual processing
+            content = process_audio_file(file)
             combined_content += content + "\n"
         else:
             return jsonify({"error": f"Unsupported file type: {file_type}"}), 400
@@ -93,7 +162,6 @@ def upload_files():
     }
     
     return jsonify({"status": "Files processed and persona context created."}), 200
-
 
 # Function to interact with the persona using Groq API
 def ask_question(persona, context, question):
@@ -115,7 +183,6 @@ def ask_question(persona, context, question):
         return chat_completion.choices[0].message.content
     except KeyError:
         return "Error: Could not retrieve a valid response from the model."
-
 
 # Chat with persona route
 @app.route('/ask', methods=['POST'])
