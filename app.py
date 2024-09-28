@@ -18,7 +18,7 @@ UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Initialize the Groq client
-client = Groq(api_key="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")
+client = Groq(api_key="")
 
 # Data storage (in-memory for simplicity)
 user_data = {}  # {user_id: {persona: ..., context: ...}}
